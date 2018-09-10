@@ -101,7 +101,7 @@ public class Hotel {
 	      } 
 		
 		findActiveBookingByRoomId(confirmationNumber);//The Booking referenced by confirmationNumber should be returned by getActiveBookingByRoomId()
-		
+		state = State.CheckedIn; // still confuse about this ...//The Booking referenced by confirmationNumber should have a state of CHECKED_IN
 		
 		
 		
@@ -110,6 +110,14 @@ public class Hotel {
 
 
 	public void addServiceCharge(int roomId, ServiceType serviceType, double cost) {
+		
+		if(roomId != findActiveBookingByRoomId(int roomId)){
+		throw new RuntimeException("no active booking associated with the room identified by roomID can be found"); 
+			//throws a RuntimeException if no active booking associated with the room identified by roomID can be found
+		}
+		
+		
+		
 		// TODO Auto-generated method stub
 	}
 
