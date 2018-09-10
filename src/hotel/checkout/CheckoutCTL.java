@@ -53,6 +53,7 @@ public class CheckoutCTL {
 			sb.append(String.format("Charges for room: %d, booking: %d\n", 
 					roomId, booking.getConfirmationNumber()));
 			
+
 			SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
 			String dateStr = format.format(booking.getArrivalDate());
 			sb.append(String.format("Arrival date: %s, Staylength: %d\n", dateStr, booking.getStayLength()));
@@ -98,7 +99,23 @@ public class CheckoutCTL {
 
 	
 	public void creditDetailsEntered(CreditCardType type, int number, int ccv) {
+
+		if(state != CREDIT){
+		throw new RuntimeException("state is not credit");
+		}
 		// TODO Auto-generated method stub
+         System.out.printf("a new credit card are going to be created");
+		if(CreditAuthorizer.authorize(type, number, ccv)){
+		hotel.checkOut();
+		UI.displayMessage("Credit Card debited");
+			state = State.COMPLETED;
+			UI.state = state.COMPLETED;
+		}else{
+		 UI.displayMessage("credit card not approval");
+		
+		}
+
+		
 	}
 
 
