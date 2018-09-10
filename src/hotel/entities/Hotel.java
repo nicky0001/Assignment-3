@@ -94,6 +94,17 @@ public class Hotel {
 
 	
 	public void checkin(long confirmationNumber) {
+		
+		 //throws a RuntimeException if no booking for confirmation number exists
+              if(findBookingByConfirmationNumber(confirmationNumber) != confirmationNumber){
+	      throw new RuntimeException("no booking for confirmation number exists");
+	      } 
+		
+		findActiveBookingByRoomId(confirmationNumber);//The Booking referenced by confirmationNumber should be returned by getActiveBookingByRoomId()
+		
+		
+		
+		
 		// TODO Auto-generated method stub
 	}
 
