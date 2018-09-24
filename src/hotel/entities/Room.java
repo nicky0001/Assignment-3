@@ -15,12 +15,14 @@ public class Room {
 	RoomType roomType;
 	List<Booking> bookings;
 	State state;
+	BookingHelper bookingHelper;
 
 	
 	public Room(int id, RoomType roomType) {
 		this.id = id;
 		this.roomType = roomType;
 		bookings = new ArrayList<>();
+		bookingHelper = BookingHelper.getInstance();
 		state = State.READY;
 	}
 	
@@ -59,19 +61,37 @@ public class Room {
 	}
 
 
+	public boolean isOccupied() {
+		return state == State.OCCUPIED;
+	}
+
+
 	public Booking book(Guest guest, Date arrivalDate, int stayLength, int numberOfOccupants, CreditCard creditCard) {
-		// TODO Auto-generated method stub
-		return null;		
+		if (!isAvailable(arrivalDate, stayLength)) {
+			throw new RuntimeException("Cannot create an overlapping booking");
+		}
+		Booking booking = bookingHelper.makeBooking(guest, this, arrivalDate, stayLength, numberOfOccupants, creditCard);
+		bookings.add(booking);
+		return booking;		
 	}
 
 
 	public void checkin() {
-		// TODO Auto-generated method stub
+		if (state != State.READY) {
+			String mesg = String.format("Room: checkin : bad state : %s", state);
+			throw new RuntimeException(mesg);
+		}
+		state = State.OCCUPIED;
 	}
 
 
 	public void checkout(Booking booking) {
-		// TODO Auto-generated method stub
+		if (state != State.OCCUPIED) {
+			String mesg = String.format("Room: checkout : bad state : %s", state);
+			throw new RuntimeException(mesg);
+		}
+		bookings.remove(booking);
+		state = State.READY;
 	}
 
 
