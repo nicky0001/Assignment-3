@@ -1,135 +1,151 @@
 package hotel.checkout;
 
-import java.text.SimpleDateFormat;
-import java.util.List;
-
-import hotel.credit.CreditAuthorizer;
-import hotel.credit.CreditCard;
 import hotel.credit.CreditCardType;
-import hotel.entities.Booking;
-import hotel.entities.Guest;
-import hotel.entities.Hotel;
-import hotel.entities.ServiceCharge;
+import hotel.exceptions.CancelException;
+import hotel.exceptions.NullInputException;
 import hotel.utils.IOUtils;
 
-public class CheckoutCTL {
+public class CheckoutUI {
 
-	private enum State {ROOM, ACCEPT, CREDIT, CANCELLED, COMPLETED };
+	public static enum State {ROOM, ACCEPT, CREDIT, CANCELLED, COMPLETED};
 	
-	private Hotel hotel;
-	private State state;
-	private CheckoutUI checkoutUI;
-	private double total;
-	private int roomId;
-
-
-	public CheckoutCTL(Hotel hotel) {
-		this.hotel = hotel;
-		this.checkoutUI = new CheckoutUI(this);
+	CheckoutCTL checkoutCTL;
+	State state;
+	
+	
+	public CheckoutUI(CheckoutCTL checkoutCTL) {
+		this.checkoutCTL = checkoutCTL;
+		this.state = State.ROOM;
 	}
 
-	
+
 	public void run() {
-		IOUtils.trace("BookingCTL: run");
-		state = State.ROOM;
-		checkoutUI.run();
-	}
-
-	
-	public void roomIdEntered(int roomId) {
-		if (state != State.ROOM) {
-			String mesg = String.format("CheckoutCTL: roomIdEntered : bad state : %s", state);
-			throw new RuntimeException(mesg);
-		}
-		this.roomId = roomId;
-		Booking booking = hotel.findActiveBookingByRoomId(roomId);
-		if (booking == null) {
-			String mesg = String.format("No active booking found for room id %d", roomId);			
-			checkoutUI.displayMessage(mesg);
-			//cancel();
-		}	
-		else {			
-			StringBuilder sb = new StringBuilder();
-			sb.append(String.format("Charges for room: %d, booking: %d\n", 
-					roomId, booking.getConfirmationNumber()));
-			
-
-			SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
-			String dateStr = format.format(booking.getArrivalDate());
-			sb.append(String.format("Arrival date: %s, Staylength: %d\n", dateStr, booking.getStayLength()));
-			
-			Guest guest = booking.getGuest();
-			sb.append(String.format("Guest: %s, Address: %s, Phone: %d\n", 
-					guest.getName(), guest.getAddress(), guest.getPhoneNumber()));
-			
-			sb.append("Charges:\n");
-			
-			total = 0;
-			List<ServiceCharge> charges = booking.getCharges();
-			for (ServiceCharge sc : charges) {
-				total += sc.getCost();
-				String chargeStr = String.format("    %-12s:%10s", 
-						sc.getDescription(), String.format("$%.2f", sc.getCost()));
-				sb.append(chargeStr).append("\n");			
+		IOUtils.trace("CheckoutUI: run");
+		
+		boolean completed = false;		
+		while (!completed) {
+			try {
+				switch (state) {
+				
+				case ROOM:
+					int roomId = enterRoomId();
+					checkoutCTL.roomIdEntered(roomId);
+					break;
+					
+				case ACCEPT:
+					boolean accepted = acceptCharges();
+					checkoutCTL.chargesAccepted(accepted);
+					break;
+					
+				case CREDIT:
+					CreditDetails details = enterCreditDetails();
+					checkoutCTL.creditDetailsEntered(details.type, details.number, details.ccv);
+					break;
+										
+				case CANCELLED:
+					completed = true;
+					break;
+					
+				case COMPLETED:
+					IOUtils.input("Hit <enter> to continue");
+					checkoutCTL.completed();
+					completed = true;
+					break;
+					
+				default:
+					String mesg = String.format("CheckoutUI: run : unknown state : %s", state);
+					IOUtils.outputln(mesg);
+				}
 			}
-			sb.append(String.format("Total: $%.2f\n", total));
-			String mesg = sb.toString();
-			checkoutUI.displayMessage(mesg);
-			state = State.ACCEPT;
-			checkoutUI.setState(CheckoutUI.State.ACCEPT);	
+			catch (CancelException e) {
+				checkoutCTL.cancel();
+			}
 		}
 	}
 
 
-	public void chargesAccepted(boolean accepted) {
-		if (state != State.ACCEPT) {
-			String mesg = String.format("CheckoutCTL: roomIdEntered : bad state : %s", state);
-			throw new RuntimeException(mesg);
-		}
-		if (!accepted) {
-			checkoutUI.displayMessage("Charges not accepted");
-			cancel();
-		}
-		else {
-			checkoutUI.displayMessage("Charges accepted");
-			state = State.CREDIT;
-			checkoutUI.setState(CheckoutUI.State.CREDIT);
+	private boolean acceptCharges() {
+		boolean accepted = IOUtils.getBooleanYesNoAnswer("Accept charges");
+		return accepted;
+	}
+
+
+	public CreditDetails enterCreditDetails() {		
+		IOUtils.trace("CheckoutUI: enterCreditDetails");		
+		CreditCardType creditCardType = null;
+		int cardNumber = 0;
+		int ccv = 0;
+		IOUtils.outputln("\nEnter credit card details");
+		
+		boolean completed = false;
+		while (!completed) {			
+			//enter credit card type
+			try {
+				creditCardType = IOUtils.getValidCreditType("Enter credit card type");
+			}
+			catch (NullInputException e) {
+				IOUtils.outputln("CheckoutUI: User cancelled at enter credit card type");
+				throw new CancelException();
+			}			
+			//enter credit card number
+			try {
+				cardNumber = IOUtils.getValidPositiveInt("Enter credit card number: ");
+			}
+			catch (NullInputException e) {
+				IOUtils.outputln("CheckoutUI: User reset at input credit card number");
+				continue;
+			}	
+			//enter ccv
+			try {
+				ccv = IOUtils.getValidPositiveInt("Enter CCV: ");
+			}
+			catch (NullInputException e) {
+				IOUtils.outputln("CheckoutUI: User reset at input CCV");
+				continue;
+			}	
+			completed = true;
 		}		
+		CreditDetails creditDetails = new CreditDetails(creditCardType, cardNumber, ccv);
+		return creditDetails;
 	}
 
-	
-	public void creditDetailsEntered(CreditCardType type, int number, int ccv) {
 
-		if(state != CREDIT){
-		throw new RuntimeException("state is not credit");
-		}
-		// TODO Auto-generated method stub
-         System.out.printf("a new credit card are going to be created");
-		if(CreditAuthorizer.authorize(type, number, ccv)){
-		hotel.checkOut();
-		UI.displayMessage("Credit Card debited");
-			state = State.COMPLETED;
-			UI.state = state.COMPLETED;
-		}else{
-		 UI.displayMessage("credit card not approval");
+	private int enterRoomId() {
+		IOUtils.trace("CheckoutUI: enterRoomId");
 		
+		int number = 0;
+		try {
+			number = IOUtils.getValidPositiveInt("Enter room number: ");
 		}
-
-		
+		catch (NullInputException e) {
+			IOUtils.outputln("CheckoutUI: User cancelled at input room number");
+			throw new CancelException();
+		}
+		return number;
 	}
 
 
-	public void cancel() {
-		checkoutUI.displayMessage("Checking out cancelled");
-		state = State.CANCELLED;
-		checkoutUI.setState(CheckoutUI.State.CANCELLED);
+	public void setState(State state) {
+		this.state = state;
 	}
+
+
+	public void displayMessage(String message) {
+		IOUtils.outputln(message);
+	}
+
 	
+	class CreditDetails {	
+		CreditCardType type;
+		int number;
+		int ccv;
 	
-	public void completed() {
-		checkoutUI.displayMessage("Checking out completed");
-	}
-
-
+		public CreditDetails(CreditCardType creditCardType, int cardNumber, int ccv) {
+			this.type = creditCardType;
+			this.number = cardNumber;
+			this.ccv = ccv;
+		}
+	}	
+	
 
 }
