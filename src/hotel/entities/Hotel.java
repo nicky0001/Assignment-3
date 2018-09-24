@@ -1,7 +1,10 @@
 package hotel.entities;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import hotel.credit.CreditCard;
@@ -9,10 +12,10 @@ import hotel.utils.IOUtils;
 
 public class Hotel {
 	
-	private Map<Integer, Guest> guests;
-	public Map<RoomType, Map<Integer,Room>> roomsByType;
-	public Map<Long, Booking> bookingsByConfirmationNumber;
-	public Map<Integer, Booking> activeBookingsByRoomId;
+	Map<Integer, Guest> guests;
+	Map<RoomType, Map<Integer,Room>> roomsByType;
+	Map<Long, Booking> bookingsByConfirmationNumber;
+	Map<Integer, Booking> activeBookingsByRoomId;
 	
 	
 	public Hotel() {
@@ -66,7 +69,13 @@ public class Hotel {
 		return booking;
 	}
 
+	
+	public List<Room> findRoomsByType(RoomType type) {
+		List<Room> rooms = new ArrayList<>(roomsByType.get(type).values());
+		return Collections.unmodifiableList(rooms);
+	}
 
+	
 	public Room findAvailableRoom(RoomType selectedRoomType, Date arrivalDate, int stayLength) {
 		IOUtils.trace("Hotel: checkRoomAvailability");
 		Map<Integer, Room> rooms = roomsByType.get(selectedRoomType);
@@ -88,24 +97,44 @@ public class Hotel {
 	public long book(Room room, Guest guest, 
 			Date arrivalDate, int stayLength, int occupantNumber,
 			CreditCard creditCard) {
-		// TODO Auto-generated method stub
-		return 0L;		
+		
+		Booking booking = room.book(guest, arrivalDate, stayLength, occupantNumber, creditCard);
+		long confirmationNumber = booking.getConfirmationNumber();
+		bookingsByConfirmationNumber.put(confirmationNumber, booking);
+		return confirmationNumber;		
 	}
 
 	
 	public void checkin(long confirmationNumber) {
-		// TODO Auto-generated method stub
+		Booking booking = bookingsByConfirmationNumber.get(confirmationNumber);
+		if (booking == null) {
+			String message = String.format("Hotel: checkin: No booking found for confirmation number %d", confirmationNumber);
+			throw new RuntimeException(message);
+		}
+		int roomId = booking.getRoomId();
+		
+		booking.checkIn();
+		activeBookingsByRoomId.put(roomId, booking);
 	}
 
 
 	public void addServiceCharge(int roomId, ServiceType serviceType, double cost) {
-		// TODO Auto-generated method stub
+		Booking booking = activeBookingsByRoomId.get(roomId);
+		if (booking == null) {
+			String mesg = String.format("Hotel: addServiceCharge: no booking present for room id : %d", roomId);
+			throw new RuntimeException(mesg);
+		}
+		booking.addServiceCharge(serviceType, cost);
 	}
 
 	
 	public void checkout(int roomId) {
-		// TODO Auto-generated method stub
+		Booking booking = activeBookingsByRoomId.get(roomId);
+		if (booking == null) {
+			String mesg = String.format("Hotel: checkout: no booking present for room id : %d", roomId);
+			throw new RuntimeException(mesg);
+		}
+		booking.checkOut();
+		activeBookingsByRoomId.remove(roomId);
 	}
-
-
 }
