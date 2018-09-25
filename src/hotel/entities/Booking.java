@@ -11,19 +11,21 @@ import hotel.utils.IOUtils;
 
 public class Booking {
 	
-	private enum State {PENDING, CHECKED_IN, CHECKED_OUT};
+	public enum State {PENDING, CHECKED_IN, CHECKED_OUT};
 	
-	private Guest guest;
-	private Room room;
-	private Date bookedArrival; 
-	private int stayLength;
+	Guest guest;
+	Room room;
+	Date bookedArrival; 
+	int stayLength;
 	int numberOfOccupants;
 	long confirmationNumber;
 	CreditCard creditCard;
 	
-	private List<ServiceCharge> charges;
+	ServiceChargeHelper serviceChargeHelper;
 	
-	private State state;
+	List<ServiceCharge> charges;
+	
+	public State state;
 
 
 	
@@ -39,17 +41,23 @@ public class Booking {
 		this.numberOfOccupants = numberOfOccupants;
 		this.confirmationNumber = generateConfirmationNumber(room.getId(), arrivalDate);
 		this.creditCard = creditCard;
+		this.serviceChargeHelper = ServiceChargeHelper.getInstance();
 		this.charges = new ArrayList<>();
 		this.state = State.PENDING;
 	}
 
 	
+	public Booking() {
+		
+	}
+
+
 	private long generateConfirmationNumber(int roomId, Date arrivalDate) {
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(arrivalDate);
 		
 		int year = calendar.get(Calendar.YEAR);
-		int month = calendar.get(Calendar.MONTH);
+		int month = calendar.get(Calendar.MONTH) + 1;
 		int day = calendar.get(Calendar.DAY_OF_MONTH);
 		
 		String numberString = String.format("%d%d%d%d", day, month, year, roomId);
@@ -133,17 +141,33 @@ public class Booking {
 
 
 	public void checkIn() {
-		// TODO Auto-generated method stub
-	}
-
-
-	public void addServiceCharge(ServiceType serviceType, double cost) {
-		// TODO Auto-generated method stub
+		if (state != State.PENDING) {
+			String mesg = String.format("Booking: checkIn : bad state : %s", state);
+			throw new RuntimeException(mesg);
+		}	
+		room.checkin();
+		state = State.CHECKED_IN;
 	}
 
 
 	public void checkOut() {
-		// TODO Auto-generated method stub
+		if (state != State.CHECKED_IN) {
+			String mesg = String.format("Booking: checkOut : bad state : %s", state);
+			throw new RuntimeException(mesg);
+		}	
+		room.checkout(this);
+		state = State.CHECKED_OUT;
 	}
+
+
+	public void addServiceCharge(ServiceType serviceType, double cost) {
+		if (state != State.CHECKED_IN) {
+			String mesg = String.format("Booking: addServiceCharge : bad state : %s", state);
+			throw new RuntimeException(mesg);
+		}	
+		ServiceCharge charge = serviceChargeHelper.makeServiceCharge(serviceType, cost);
+		charges.add(charge);
+	}
+
 
 }
